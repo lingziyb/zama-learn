@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我还活着</title>
+<style>
+  body{margin:0;height:100vh;background:#000;color:#fff;display:grid;place-items:center;font-family:system-ui;text-align:center}
+  h1{font-size:3.5rem;margin:0}
+  .num{font-size:2.8rem;color:#ff0;font-weight:bold}
+  button{margin-top:3rem;padding:2rem 6rem;font-size:2.8rem;background:#c00;border:none;border-radius:16px;color:white;cursor:pointer}
+  button:disabled{background:#333;cursor:not-allowed}
+  .tip{margin-top:2rem;opacity:0.7;font-size:1.2rem}
+</style>
+</head>
+<body>
+<h1>我还活着</h1>
+<p>今天已有 <span class="num" id="num">0</span> 人说“我还活着”</p >
+<button id="btn">今天我还在</button>
+<p class="tip">每天一次 · 全程 FHE 加密 · 无人可追踪</p >
+
+<script type="module">
+  import { initSDK, createInstance, SepoliaConfig } from 'https://cdn.zama.ai/relayer-sdk-js/0.2.0/relayer-sdk-js.js';
+  
+  class App {
+    constructor() {
+      this.CONTRACT = "0xbc8dcA6598920da76559Ef4eFbF0ce96D7900E86";
+      this.btn = document.getElementById('btn');
+      this.num = document.getElementById('num');
+      this.start();
+    }
+    async start() {
+      try {
+        this.btn.textContent = "初始化中…"; this.btn.disabled = true;
+        await initSDK();
+        this.instance = await createInstance({ ...SepoliaConfig, network: window.ethereum });
+        this.contract = this.instance.contract(this.CONTRACT, [
+          {inputs:[{name:"input",type:"externalEuint32"},{name:"proof",type:"bytes"}],name:"checkin",outputs:[],stateMutability:"nonpayable",type:"function"},
+          {inputs:[],name:"getTotal",outputs:[{type:"euint32"}],stateMutability:"view",type:"function"}
+        ]);
+        await this.refresh();
+        this.btn.textContent = "今天我还在"; this.btn.disabled = false;
+        this.btn.onclick = () => this.checkin();
+      } catch(e) { document.body.innerHTML += `<p style="color:red">错误：${e.message}</p >`; }
+    }
+    async refresh() { if(this.instance){ const e = await this.contract.getTotal(); this.num.textContent = await this.instance.decrypt32(e); } }
+    async checkin() {
+      this.btn.disabled = true; this.btn.textContent = "发送中…";
+      try {
+        const enc1 = this.instance.encrypt32(1);
+        const proof = await this.instance.createProof(enc1);
+        await this.contract.checkin(enc1, proof);
+        await this.refresh();
+        this.btn.textContent = "今天已打卡";
+      } catch(e) { console.error(e); this.btn.textContent = "今天我还在"; }
+      this.btn.disabled = false;
+    }
+  }
+  new App();
+  setInterval(() => new App().refresh?.(), 12000);
+</script>
+</body>
+</html>
